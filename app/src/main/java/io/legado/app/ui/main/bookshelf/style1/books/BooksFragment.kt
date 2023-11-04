@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.core.view.isGone
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -12,7 +13,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
-import io.legado.app.constant.PreferKey
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.FragmentBooksBinding
@@ -50,9 +51,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     private val binding by viewBinding(FragmentBooksBinding::bind)
     private val activityViewModel by activityViewModels<MainViewModel>()
-    private val bookshelfLayout by lazy {
-        getPrefInt(PreferKey.bookshelfLayout)
-    }
+    private val bookshelfLayout by lazy { AppConfig.bookshelfLayout }
     private val booksAdapter: BaseBooksAdapter<*> by lazy {
         if (bookshelfLayout == 0) {
             BooksAdapterList(requireContext(), this)
@@ -69,6 +68,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
     var bookSort = 0
         private set
     private var upLastUpdateTimeJob: Job? = null
+    private var defaultScrollBarSize = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         this.savedInstanceState = savedInstanceState
@@ -84,6 +84,8 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        defaultScrollBarSize = binding.rvBookshelf.scrollBarSize
+        upFastScrollerBar()
         binding.refreshLayout.setColorSchemeColors(accentColor)
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
@@ -115,6 +117,16 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         startLastUpdateTimeJob()
     }
 
+    private fun upFastScrollerBar() {
+        val showBookshelfFastScroller = AppConfig.showBookshelfFastScroller
+        binding.rvBookshelf.setFastScrollEnabled(showBookshelfFastScroller)
+        if (showBookshelfFastScroller) {
+            binding.rvBookshelf.scrollBarSize = 0
+        } else {
+            binding.rvBookshelf.scrollBarSize = defaultScrollBarSize
+        }
+    }
+
     fun upBookSort(sort: Int) {
         binding.root.post {
             arguments?.putInt("bookSort", sort)
@@ -132,8 +144,8 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
      */
     private fun upRecyclerData() {
         booksFlowJob?.cancel()
-        booksFlowJob = launch {
-            BookGroup.flowBook(groupId).conflate().map { list ->
+        booksFlowJob = lifecycleScope.launch {
+            appDb.bookDao.flowByGroup(groupId).map { list ->
                 //排序
                 when (bookSort) {
                     1 -> list.sortedByDescending { it.latestChapterTime }
@@ -154,6 +166,9 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
                 AppLog.put("书架更新出错", it)
             }.conflate().collect { list ->
                 binding.tvEmptyMsg.isGone = list.isNotEmpty()
+                binding.refreshLayout.run {
+                    isEnabled = isEnabled && list.isNotEmpty()
+                }
                 booksAdapter.setItems(list)
                 recoverPositionState()
                 delay(100)
@@ -191,7 +206,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         if (!AppConfig.showLastUpdateTime) {
             return
         }
-        upLastUpdateTimeJob = launch {
+        upLastUpdateTimeJob = lifecycleScope.launch {
             while (isActive) {
                 if (SystemUtils.isScreenOn()) {
                     booksAdapter.upLastUpdateTime()
@@ -272,6 +287,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
             booksAdapter.notifyDataSetChanged()
             startLastUpdateTimeJob()
+            upFastScrollerBar()
         }
     }
 }

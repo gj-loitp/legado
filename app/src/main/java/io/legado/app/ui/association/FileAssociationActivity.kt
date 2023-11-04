@@ -5,9 +5,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.databinding.ActivityTranslucenceBinding
 import io.legado.app.help.config.AppConfig
@@ -16,13 +16,19 @@ import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.file.HandleFileContract
-import io.legado.app.utils.*
+import io.legado.app.utils.FileUtils
+import io.legado.app.utils.checkWrite
+import io.legado.app.utils.getFile
+import io.legado.app.utils.isContentScheme
+import io.legado.app.utils.readUri
+import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
-
 import java.io.File
 import java.io.FileOutputStream
 
@@ -113,7 +119,7 @@ class FileAssociationActivity :
         intent.data?.let { data ->
             if (data.isContentScheme()) {
                 viewModel.dispatchIndent(data)
-            } else if (!AppConst.isPlayChannel || Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+            } else if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
                 PermissionsCompat.Builder()
                     .addPermissions(*Permissions.Group.STORAGE)
                     .rationale(R.string.tip_perm_request_storage)
@@ -147,7 +153,7 @@ class FileAssociationActivity :
     }
 
     private fun importBook(treeUri: Uri, uri: Uri) {
-        launch {
+        lifecycleScope.launch {
             runCatching {
                 withContext(IO) {
                     if (treeUri.isContentScheme()) {

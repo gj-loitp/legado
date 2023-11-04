@@ -1,11 +1,13 @@
 package io.legado.app.ui.book.source.edit
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.EditText
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.tabs.TabLayout
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
@@ -86,7 +88,7 @@ class BookSourceEditActivity :
     }
 
     private val softKeyboardTool by lazy {
-        KeyboardToolPop(this, this, binding.root, this)
+        KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -118,7 +120,7 @@ class BookSourceEditActivity :
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_save -> viewModel.save(getSource()) {
-                setResult(Activity.RESULT_OK)
+                setResult(Activity.RESULT_OK, Intent().putExtra("origin", it.bookSourceUrl))
                 finish()
             }
 
@@ -409,8 +411,8 @@ class BookSourceEditActivity :
                 "intro" -> searchRule.intro =
                     viewModel.ruleComplete(it.value, searchRule.bookList)
 
-                "updateTime" -> searchRule.updateTime =
-                    viewModel.ruleComplete(it.value, searchRule.bookList)
+//                "updateTime" -> searchRule.updateTime =
+//                    viewModel.ruleComplete(it.value, searchRule.bookList)
 
                 "wordCount" -> searchRule.wordCount =
                     viewModel.ruleComplete(it.value, searchRule.bookList)
@@ -441,8 +443,8 @@ class BookSourceEditActivity :
                 "intro" -> exploreRule.intro =
                     viewModel.ruleComplete(it.value, exploreRule.bookList)
 
-                "updateTime" -> exploreRule.updateTime =
-                    viewModel.ruleComplete(it.value, exploreRule.bookList)
+//                "updateTime" -> exploreRule.updateTime =
+//                    viewModel.ruleComplete(it.value, exploreRule.bookList)
 
                 "wordCount" -> exploreRule.wordCount =
                     viewModel.ruleComplete(it.value, exploreRule.bookList)
@@ -470,8 +472,8 @@ class BookSourceEditActivity :
                 "intro" -> bookInfoRule.intro =
                     viewModel.ruleComplete(it.value, bookInfoRule.init)
 
-                "updateTime" -> bookInfoRule.updateTime =
-                    viewModel.ruleComplete(it.value, bookInfoRule.init)
+//                "updateTime" -> bookInfoRule.updateTime =
+//                    viewModel.ruleComplete(it.value, bookInfoRule.init)
 
                 "wordCount" -> bookInfoRule.wordCount =
                     viewModel.ruleComplete(it.value, bookInfoRule.init)
@@ -556,7 +558,7 @@ class BookSourceEditActivity :
     }
 
     private fun alertGroups() {
-        launch {
+        lifecycleScope.launch {
             val groups = withContext(IO) {
                 appDb.bookSourceDao.allGroups()
             }
@@ -628,7 +630,7 @@ class BookSourceEditActivity :
 
     private fun setSourceVariable() {
         viewModel.save(getSource()) { source ->
-            launch {
+            lifecycleScope.launch {
                 val comment =
                     source.getDisplayVariableComment("源变量可在js中通过source.getVariable()获取")
                 val variable = withContext(IO) { source.getVariable() }
